@@ -3,37 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daftar Harga Fadlanzz</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Pricelist OkeConnect</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        h2 { text-align: center; color: #1a73e8; }
+        .search-box {
+            width: 100%;
+            padding: 15px;
+            margin: 20px 0;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .search-box:focus { border-color: #1a73e8; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background-color: #1a73e8;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .normal { background: #e6f4ea; color: #1e8e3e; }
+        .gangguan { background: #fce8e6; color: #d93025; }
+        #loading { text-align: center; padding: 20px; color: #666; }
     </style>
 </head>
-<body class="p-4">
-    <div class="max-w-4xl mx-auto">
-        <div class="text-center my-8">
-            <h1 class="text-2xl font-bold text-slate-800 uppercase">Daftar Harga Real-Time</h1>
-            <p class="text-slate-500 text-sm mt-1">Harga Otomatis +Rp 200</p>
-        </div>
+<body>
 
-        <div id="category-list" class="flex flex-wrap justify-center gap-2 mb-6">
-            <button onclick="filterData('Semua')" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-md">SEMUA</button>
-        </div>
+<div class="container">
+    <h2>Pricelist Realtime</h2>
+    <input type="text" id="searchInput" class="search-box" placeholder="Cari nama produk atau kategori...">
+    
+    <div id="loading">Menghubungkan ke server (via Proxy)...</div>
 
-        <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="bg-slate-800 text-white text-left">
-                        <th class="p-4 font-semibold">Produk</th>
-                        <th class="p-4 font-semibold text-right">Harga Final</th>
-                        <th class="p-4 font-semibold text-center">Status</th>
-                    </tr>
-                </thead>
-                <tbody id="table-body" class="divide-y divide-slate-100">
-                    <tr><td colspan="3" class="p-10 text-center">Menghubungkan ke server...</td></tr>
-                </tbody>
-            </table>
+    <table id="priceTable" style="display:none;">
+        <thead>
+            <tr>
+                <th>Produk</th>
+                <th>Kategori</th>
+                <th>Harga</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="priceData"></tbody>
+    </table>
+</div>
+
+<script>
+    const targetUrl = 'https://okeconnect.com/harga/list?id=905ccd028329b0a';
+    // Menggunakan proxy AllOrigins untuk menembus CORS
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
+    let allData = [];
+
+    async function loadData() {
+        try {
+            const response = await fetch(proxyUrl);
+            const wrapper = await response.json();
+            
+            // Data asli ada di dalam properti 'contents' dalam bentuk string
+            const result = JSON.parse(wrapper.contents);
+            
+            // Tergantung struktur JSON OkeConnect, biasanya result.data atau result langsung
+            allData = Array.isArray(result) ? result : (result.data || []);
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('priceTable').style.display = 'table';
+            
+            renderTable(allData);
+        } catch (error) {
+            console.error(error);
+            document.getElementById('loading').innerHTML = 
+                `<b style="color:red;">Gagal memuat data.</b><br>Pastikan koneksi internet stabil atau coba refresh halaman.`;
+        }
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('priceData');
+        tbody.innerHTML = '';
+        
+        data.forEach(item => {
+            const row = document.createElement('tr');
+            const statusClass = item.status === 'normal' ? 'normal' : 'gangguan';
+            const harga = parseInt(item.price || item.harga || 0).toLocaleString('id-ID');
+
+            row.innerHTML = `
+                <td><b>${item.product_name || item.nama || '-'}</b><br><small>${item.code || ''}</small></td>
+                <td>${item.category || item.operator || '-'}</td>
+                <td>Rp ${harga}</td>
+                <td><span class="status-badge ${statusClass}">${item.status || 'OFF'}</span></td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        const val = e.target.value.toLowerCase();
+        const filtered = allData.filter(item => 
+            (item.product_name || item.nama || '').toLowerCase().includes(val) ||
+            (item.category || item.operator || '').toLowerCase().includes(val)
+        );
+        renderTable(filtered);
+    });
+
+    loadData();
+</script>
+
+</body>
+</html>
         </div>
     </div>
 
